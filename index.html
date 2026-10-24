@@ -1,0 +1,369 @@
+<!DOCTYPE html>
+<html lang="ja">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width,initial-scale=1.0,maximum-scale=1.0,user-scalable=no">
+<title>ペンギン積み木タワー</title>
+<style>
+*{
+margin:0;
+padding:0;
+box-sizing:border-box;
+-webkit-tap-highlight-color:transparent;
+touch-action:none;
+}
+html,body{
+width:100%;
+height:100%;
+overflow:hidden;
+font-family:sans-serif;
+background:linear-gradient(#8ed6ff,#dff7ff);
+}
+.screen{
+display:none;
+width:100%;
+height:100%;
+flex-direction:column;
+align-items:center;
+justify-content:center;
+padding:16px;
+text-align:center;
+}
+.screen.active{
+display:flex;
+}
+h1{
+font-size:2rem;
+margin-bottom:16px;
+}
+p{
+line-height:1.5;
+margin:8px 0;
+}
+button{
+min-width:180px;
+min-height:56px;
+font-size:1.1rem;
+font-weight:bold;
+border:none;
+border-radius:14px;
+background:#1976d2;
+color:#fff;
+margin-top:16px;
+}
+#gameScreen{
+justify-content:flex-start;
+padding:8px;
+}
+.topbar{
+width:100%;
+display:flex;
+justify-content:space-between;
+padding:8px;
+font-size:1.2rem;
+font-weight:bold;
+}
+#combo{
+height:28px;
+font-weight:bold;
+color:#ff6600;
+}
+#special{
+height:32px;
+font-size:1.4rem;
+font-weight:bold;
+color:#ff0080;
+}
+#gameArea{
+position:relative;
+width:100%;
+max-width:500px;
+flex:1;
+background:linear-gradient(#bde9ff,#eefcff);
+border:3px solid #2b6cb0;
+border-radius:12px;
+overflow:hidden;
+}
+#tower{
+position:absolute;
+left:50%;
+transform:translateX(-50%);
+bottom:0;
+width:240px;
+display:flex;
+flex-direction:column-reverse;
+align-items:center;
+}
+.block{
+height:28px;
+border-radius:6px;
+border:2px solid rgba(0,0,0,.15);
+margin-top:2px;
+}
+#movingBlock{
+position:absolute;
+width:90px;
+height:28px;
+top:60px;
+border-radius:6px;
+border:2px solid rgba(0,0,0,.2);
+background:#ffb347;
+}
+#penguin{
+position:absolute;
+left:50%;
+transform:translateX(-50%);
+bottom:8px;
+font-size:48px;
+pointer-events:none;
+}
+#rank{
+font-size:2rem;
+font-weight:bold;
+margin:16px 0;
+}
+</style>
+</head>
+<body>
+
+<div id="startScreen" class="screen active">
+<h1>🐧 ペンギン積み木タワー</h1>
+<p>
+左右に動く積み木を好きなタイミングでタップ！<br>
+できるだけズレずに積み上げよう！
+</p>
+<p>
+連続で成功するとペンギンフィーバー発動！<br>
+30秒でどこまで高くできるかな？
+</p>
+<button id="startBtn">スタート</button>
+</div>
+
+<div id="gameScreen" class="screen">
+<div class="topbar">
+<div>🏆 <span id="score">0</span></div>
+<div>⏰ <span id="time">30</span></div>
+</div>
+
+<div id="combo"></div>
+<div id="special"></div>
+
+<div id="gameArea">
+<div id="movingBlock"></div>
+<div id="tower"></div>
+<div id="penguin">🐧</div>
+</div>
+</div>
+
+<div id="resultScreen" class="screen">
+<h1>結果発表</h1>
+<p>最終スコア</p>
+<h2 id="finalScore">0</h2>
+<div id="rank">ランク C</div>
+<button id="retryBtn">もう一度遊ぶ</button>
+</div>
+
+<script>
+const startScreen=document.getElementById("startScreen");
+const gameScreen=document.getElementById("gameScreen");
+const resultScreen=document.getElementById("resultScreen");
+
+const scoreEl=document.getElementById("score");
+const timeEl=document.getElementById("time");
+const comboEl=document.getElementById("combo");
+const specialEl=document.getElementById("special");
+
+const gameArea=document.getElementById("gameArea");
+const movingBlock=document.getElementById("movingBlock");
+const tower=document.getElementById("tower");
+
+let score=0;
+let time=30;
+let combo=0;
+let playing=false;
+let moveTimer=null;
+let timer=null;
+let blockX=0;
+let direction=1;
+
+function showScreen(screen){
+[startScreen,gameScreen,resultScreen].forEach(s=>{
+s.classList.remove("active");
+});
+screen.classList.add("active");
+}
+
+function randomColor(){
+const colors=[
+"#ffb347",
+"#ff7b7b",
+"#72c8ff",
+"#8fd14f",
+"#ffd966",
+"#c99cff"
+];
+return colors[Math.floor(Math.random()*colors.length)];
+}
+
+function createMovingBlock(){
+movingBlock.style.background=randomColor();
+}
+
+function startGame(){
+
+clearInterval(moveTimer);
+clearInterval(timer);
+
+score=0;
+time=30;
+combo=0;
+blockX=0;
+direction=1;
+playing=true;
+
+scoreEl.textContent=0;
+timeEl.textContent=30;
+comboEl.textContent="";
+specialEl.textContent="";
+tower.innerHTML="";
+
+showScreen(gameScreen);
+
+createMovingBlock();
+
+moveTimer=setInterval(()=>{
+
+const areaWidth=gameArea.clientWidth;
+const blockWidth=movingBlock.offsetWidth;
+
+blockX += direction * 4;
+
+if(blockX <= 0){
+blockX=0;
+direction=1;
+}
+
+if(blockX >= areaWidth-blockWidth){
+blockX=areaWidth-blockWidth;
+direction=-1;
+}
+
+movingBlock.style.left=blockX+"px";
+
+},16);
+
+timer=setInterval(()=>{
+time--;
+timeEl.textContent=time;
+
+if(time<=0){
+endGame();
+}
+},1000);
+}
+
+function placeBlock(){
+
+if(!playing)return;
+
+const areaWidth=gameArea.clientWidth;
+const centerLine=areaWidth/2;
+
+const blockWidth=movingBlock.offsetWidth;
+const blockCenter=blockX + blockWidth/2;
+
+const diff=Math.abs(blockCenter-centerLine);
+
+let points=0;
+
+if(diff<=8){
+points=20;
+combo++;
+}
+else if(diff<=25){
+points=12;
+combo++;
+}
+else if(diff<=50){
+points=8;
+combo=0;
+}
+else{
+points=5;
+combo=0;
+}
+
+score += points;
+
+if(combo>=2){
+comboEl.textContent="🔥 コンボ x"+combo;
+}else{
+comboEl.textContent="";
+}
+
+if(combo>0 && combo%5===0){
+
+score += 50;
+scoreEl.textContent=score;
+
+specialEl.textContent="✨ ペンギンフィーバー！ +50 ✨";
+
+gameArea.style.background=
+"linear-gradient(#fff5a5,#ffd6f0)";
+
+setTimeout(()=>{
+specialEl.textContent="";
+gameArea.style.background=
+"linear-gradient(#bde9ff,#eefcff)";
+},1200);
+}
+
+scoreEl.textContent=score;
+
+const block=document.createElement("div");
+block.className="block";
+block.style.width="90px";
+block.style.background=randomColor();
+
+tower.appendChild(block);
+
+createMovingBlock();
+}
+
+function endGame(){
+
+playing=false;
+
+clearInterval(moveTimer);
+clearInterval(timer);
+
+document.getElementById("finalScore").textContent=score;
+
+let rank="C";
+
+if(score>=600){
+rank="S";
+}
+else if(score>=400){
+rank="A";
+}
+else if(score>=250){
+rank="B";
+}
+
+document.getElementById("rank").textContent="ランク "+rank;
+
+showScreen(resultScreen);
+}
+
+document.getElementById("startBtn").addEventListener("click",startGame);
+document.getElementById("retryBtn").addEventListener("click",startGame);
+
+gameArea.addEventListener("pointerdown",placeBlock);
+
+document.addEventListener("gesturestart",e=>e.preventDefault());
+document.addEventListener("dblclick",e=>e.preventDefault());
+</script>
+
+</body>
+</html>
